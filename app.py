@@ -12,23 +12,56 @@ import json, os
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token='12bFycKJF3vNyK1k70lDopzFbqIJe8SeOiYh5rlx3jaSUwKMNLE1HwKS7ssyUXrH17cs9Ukt0PyKPRLDc0rPpaZbN7JUUSdvSw26Kp5dv0dQbuVkq/1NqBKEGOzghgCC+lYWQZMyv/W+7If2aY0QnwdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('722c39d14647e4ab0e138badc75bda8b')
+configuration = Configuration(access_token=os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'))
+handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
 MY_USER_ID = 'U0f77cc6eef0ee1070ea10b9a48ab17ed'
 FOLDER_ID = '14UCyQ1rKcwawKP23tu4q8eIWYUQK-AcF'
-CREDS_INFO = json.loads(os.environ.get('GOOGLE_CREDENTIALS', '{}'))
 
 def get_drive_service():
-    creds = service_account.Credentials.from_service_account_info(CREDS_INFO, scopes=['https://www.googleapis.com/auth/drive'])
+    creds_info = json.loads(os.environ.get('GOOGLE_CREDENTIALS', '{}'))
+    creds = service_account.Credentials.from_service_account_info(
+        creds_info, scopes=['https://www.googleapis.com/auth/drive'])
     return build('drive', 'v3', credentials=creds)
 
 def save_note(text):
     service = get_drive_service()
-    today = datetime.now().strftime('%Y-%m-%d %H:%M')
-    content = f'{today}: {text}\n'
-    file_metadata = {'name': f'notes_{datetime.now().strftime("%Y%m%d")}.txt', 'parents': [FOLDER_ID]}
-    media = MediaInMemoryUpload(content.encode('utf-8'), mimetype='text/plain')
-    service.files().create(body=file_metadata, media_body=media).execute()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    filename = f'notes_{datetime.now().strftime("%Y%m")}.txt'
+    new_line = f'{now}: {text}\n'
+
+    # 找看看這個月的檔案存在嗎
+    results = service.files().list(
+        q=f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false",
+        fields='files(id)').execute()
+    files = results.get('files', [])
+
+    if files:
+        # 檔案存在，讀出來再追加
+        file_id = files[0]['id']
+        existing = service.files().get_media(fileId=file_id).execute()
+        updated = existing.decode('utf-8') + new_line
+        media = MediaInMemoryUpload(updated.encode('utf-8'), mimetype='text/plain')
+        service.files().update(fileId=file_id, media_body=media).execute()
+    else:
+        # 新建檔案
+        file_metadata = {'name': filename, 'parents': [FOLDER_ID]}
+        media = MediaInMemoryUpload(new_line.encode('utf-8'), mimetype='text/plain')
+        service.files().create(body=file_metadata, media_body=media).execute()
+
+def get_recent_notes(n=5):
+    service = get_drive_service()
+    filename = f'notes_{datetime.now().strftime("%Y%m")}.txt'
+    results = service.files().list(
+        q=f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false",
+        fields='files(id)').execute()
+    files = results.get('files', [])
+    if not files:
+        return '這個月還沒有筆記！'
+    file_id = files[0]['id']
+    content = service.files().get_media(fileId=file_id).execute()
+    lines = content.decode('utf-8').strip().split('\n')
+    recent = lines[-n:] if len(lines) >= n else lines
+    return '\n'.join(recent)
 
 def get_change(symbol):
     ticker = yf.Ticker(symbol)
@@ -42,7 +75,7 @@ def get_change(symbol):
 
 @app.route('/')
 def home():
-    return 'Hello!'
+    return 'Alison Bot is running!'
 
 @app.route('/check_stock')
 def check_stock():
@@ -53,7 +86,8 @@ def check_stock():
             alerts.append(f'{name} 下跌 {change:.1f}% 價格：{price:.2f} {currency}')
     if alerts:
         with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).push_message(PushMessageRequest(to=MY_USER_ID, messages=[TextMessage(text='\n'.join(alerts))]))
+            MessagingApi(api_client).push_message(
+                PushMessageRequest(to=MY_USER_ID, messages=[TextMessage(text='\n'.join(alerts))]))
     return 'OK'
 
 @app.route('/webhook', methods=['POST'])
@@ -70,9 +104,10 @@ def webhook():
 def handle_message(event):
     text = event.message.text.strip()
     upper = text.upper()
+
     if upper == 'SOXX':
         price, change = get_change('SOXX')
-        reply = f'SOXX： USD（{change:+.1f}%）'
+        reply = f'SOXX：{price:.2f} USD（{change:+.1f}%）'
     elif upper in ['台積電', 'TSMC', '2330']:
         price, change = get_change('2330.TW')
         reply = f'台積電：{price:.0f} TWD（{change:+.1f}%）'
@@ -82,11 +117,15 @@ def handle_message(event):
     elif upper == '00878':
         price, change = get_change('00878.TW')
         reply = f'00878：{price:.2f} TWD（{change:+.1f}%）'
+    elif upper in ['筆記', '最近', 'NOTE', 'NOTES']:
+        reply = get_recent_notes(5)
     else:
         save_note(text)
-        reply = '已記錄！'
+        reply = f'✅ 已記錄！'
+
     with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message_with_http_info(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply)]))
+        MessagingApi(api_client).reply_message_with_http_info(
+            ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply)]))
 
 if __name__ == '__main__':
     app.run()
