@@ -20,7 +20,7 @@ FOLDER_ID = '14UCyQ1rKcwawKP23tu4q8eIWYUQK-AcF'
 def get_drive_service():
     import base64
     raw = os.environ.get('GOOGLE_CREDENTIALS', '')
-    creds_info = json.loads(base64.b64decode(raw + '==').decode('utf-8'))
+    creds_info = json.loads(base64.b64decode(raw + '==').decode('latin-1'))
 
 def save_note(text):
     service = get_drive_service()
