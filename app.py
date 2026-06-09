@@ -17,9 +17,10 @@ handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
 MY_USER_ID = 'U0f77cc6eef0ee1070ea10b9a48ab17ed'
 FOLDER_ID = '14UCyQ1rKcwawKP23tu4q8eIWYUQK-AcF'
 
-def get_drive_service():
-    raw = os.environ.get('GOOGLE_CREDENTIALS', '{}').strip().strip("'\"")
-    creds_info = json.loads(raw)
+def  get_drive_service():
+    import base64
+    raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+    creds_info = json.loads(base64.b64decode(raw).decode('utf-8'))
 
 def save_note(text):
     service = get_drive_service()
