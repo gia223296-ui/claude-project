@@ -19,8 +19,15 @@ FOLDER_ID = '14UCyQ1rKcwawKP23tu4q8eIWYUQK-AcF'
 
 def get_drive_service():
     import base64
-    raw = os.environ.get('GOOGLE_CREDENTIALS_B64', '')
-    creds_info = json.loads(base64.b64decode(raw).decode('utf-8'))
+    try:
+        raw = os.environ.get('GOOGLE_CREDENTIALS_B64', '')
+        creds_info = json.loads(base64.b64decode(raw).decode('utf-8'))
+        creds = service_account.Credentials.from_service_account_info(
+            creds_info, scopes=['https://www.googleapis.com/auth/drive'])
+        return build('drive', 'v3', credentials=creds)
+    except Exception as e:
+        print(f'Drive error: {e}')
+        return None
 def save_note(text):
     service = get_drive_service()
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
