@@ -18,10 +18,8 @@ MY_USER_ID = 'U0f77cc6eef0ee1070ea10b9a48ab17ed'
 FOLDER_ID = '14UCyQ1rKcwawKP23tu4q8eIWYUQK-AcF'
 
 def get_drive_service():
-    creds_info = json.loads(os.environ.get('GOOGLE_CREDENTIALS', '{}'))
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info, scopes=['https://www.googleapis.com/auth/drive'])
-    return build('drive', 'v3', credentials=creds)
+    raw = os.environ.get('GOOGLE_CREDENTIALS', '{}').strip().strip("'\"")
+    creds_info = json.loads(raw)
 
 def save_note(text):
     service = get_drive_service()
