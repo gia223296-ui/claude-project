@@ -63,7 +63,7 @@ def get_recent_notes(n=5):
     if not files:
         return '這個月還沒有筆記！'
     file_id = files[0]['id']
-    content = service.files().get_media(fileId=file_id).execute()
+    seservice.files().create(body=file_metadata, media_body=media, supportsAllDrives=True).execute()
     lines = content.decode('utf-8').strip().split('\n')
     recent = lines[-n:] if len(lines) >= n else lines
     return '\n'.join(recent)
