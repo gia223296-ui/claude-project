@@ -1,4 +1,4 @@
-﻿from flask import Flask, request, abort
+from flask import Flask, request, abort
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, ReplyMessageRequest, TextMessage, PushMessageRequest
@@ -34,24 +34,24 @@ def save_note(text):
     filename = f'notes_{datetime.now().strftime("%Y%m")}.txt'
     new_line = f'{now}: {text}\n'
 
-    # 找看看這個月的檔案存在嗎
+    # ????????????
     results = service.files().list(
         q=f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false",
         fields='files(id)').execute()
     files = results.get('files', [])
 
     if files:
-        # 檔案存在，讀出來再追加
+        # ????,??????
         file_id = files[0]['id']
         existing = service.files().get_media(fileId=file_id).execute()
         updated = existing.decode('utf-8') + new_line
         media = MediaInMemoryUpload(updated.encode('utf-8'), mimetype='text/plain')
         service.files().update(fileId=file_id, media_body=media).execute()
     else:
-        # 新建檔案
+        # ????
         file_metadata = {'name': filename, 'parents': [FOLDER_ID]}
         media = MediaInMemoryUpload(new_line.encode('utf-8'), mimetype='text/plain')
-        service.files().create(body=file_metadata, media_body=media).execute()
+        service.files().create(body=file_metadata, media_body=media, supportsAllDrives=True).execute()
 
 def get_recent_notes(n=5):
     service = get_drive_service()
@@ -61,7 +61,7 @@ def get_recent_notes(n=5):
         fields='files(id)').execute()
     files = results.get('files', [])
     if not files:
-        return '這個月還沒有筆記！'
+        return '????????!'
     file_id = files[0]['id']
     service.files().update(fileId=file_id, media_body=media, supportsAllDrives=True).execute()
     lines = content.decode('utf-8').strip().split('\n')
@@ -88,7 +88,7 @@ def check_stock():
     for symbol, name, currency in [('SOXX', 'SOXX', 'USD'), ('2330.TW', 'TSMC', 'TWD')]:
         price, change = get_change(symbol)
         if change is not None and change <= -3:
-            alerts.append(f'{name} 下跌 {change:.1f}% 價格：{price:.2f} {currency}')
+            alerts.append(f'{name} ?? {change:.1f}% ??:{price:.2f} {currency}')
     if alerts:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).push_message(
@@ -112,21 +112,21 @@ def handle_message(event):
 
     if upper == 'SOXX':
         price, change = get_change('SOXX')
-        reply = f'SOXX：{price:.2f} USD（{change:+.1f}%）'
-    elif upper in ['台積電', 'TSMC', '2330']:
+        reply = f'SOXX:{price:.2f} USD({change:+.1f}%)'
+    elif upper in ['???', 'TSMC', '2330']:
         price, change = get_change('2330.TW')
-        reply = f'台積電：{price:.0f} TWD（{change:+.1f}%）'
+        reply = f'???:{price:.0f} TWD({change:+.1f}%)'
     elif upper == '00919':
         price, change = get_change('00919.TW')
-        reply = f'00919：{price:.2f} TWD（{change:+.1f}%）'
+        reply = f'00919:{price:.2f} TWD({change:+.1f}%)'
     elif upper == '00878':
         price, change = get_change('00878.TW')
-        reply = f'00878：{price:.2f} TWD（{change:+.1f}%）'
-    elif upper in ['筆記', '最近', 'NOTE', 'NOTES']:
+        reply = f'00878:{price:.2f} TWD({change:+.1f}%)'
+    elif upper in ['??', '??', 'NOTE', 'NOTES']:
         reply = get_recent_notes(5)
     else:
         save_note(text)
-        reply = f'✅ 已記錄！'
+        reply = f'? ???!'
 
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message_with_http_info(
