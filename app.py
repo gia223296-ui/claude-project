@@ -1,4 +1,4 @@
-from flask import Flask, request, abort
+﻿from flask import Flask, request, abort
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, ReplyMessageRequest, TextMessage, PushMessageRequest
@@ -34,24 +34,29 @@ def save_note(text):
     filename = f'notes_{datetime.now().strftime("%Y%m")}.txt'
     new_line = f'{now}: {text}\n'
 
-    # ????????????
     results = service.files().list(
         q=f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false",
-        fields='files(id)').execute()
+        fields='files(id)',
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True).execute()
     files = results.get('files', [])
 
     if files:
-        # ????,??????
         file_id = files[0]['id']
         existing = service.files().get_media(fileId=file_id).execute()
         updated = existing.decode('utf-8') + new_line
         media = MediaInMemoryUpload(updated.encode('utf-8'), mimetype='text/plain')
-        service.files().update(fileId=file_id, media_body=media).execute()
+        service.files().update(
+            fileId=file_id,
+            media_body=media,
+            supportsAllDrives=True).execute()
     else:
-        # ????
         file_metadata = {'name': filename, 'parents': [FOLDER_ID]}
         media = MediaInMemoryUpload(new_line.encode('utf-8'), mimetype='text/plain')
-        service.files().create(body=file_metadata, media_body=media, supportsAllDrives=True).execute()
+        service.files().create(
+            body=file_metadata,
+            media_body=media,
+            supportsAllDrives=True).execute()
 
 def get_recent_notes(n=5):
     service = get_drive_service()
